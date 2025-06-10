@@ -49,3 +49,29 @@ def get_item_data(req: ItemRequest):
         "current_price": current_price,
         "last_10_days_prices": last_10_days_prices
     }
+
+def main():
+    for line in sys.stdin:
+        req = json.loads(line)
+        id_ = req.get("id")
+        m = req.get("method")
+
+        if m == "initialize":
+            resp = {"jsonrpc":"2.0","id":id_,"result":{"name":"steamtools-mcp","capabilities":{"tools":{"listChanged":False}}}}
+        elif m == "tools/list":
+            resp = {"jsonrpc":"2.0","id":id_,"result":{"tools":[{"name":"get_item_data","description":"Fetch current and last-10-days prices","inputSchema":{"type":"object","properties":{"appid":{"type":"string"},"item_name":{"type":"string"}},"required":["appid","item_name"]}}]}}
+        elif m == "tools/call":
+            params = req["params"]
+            if params["name"]=="get_item_data":
+                result = fetch_item_data(params["arguments"]["appid"], params["arguments"]["item_name"])
+                resp = {"jsonrpc":"2.0","id":id_,"result":result}
+            else:
+                resp = {"jsonrpc":"2.0","id":id_,"error":{"code":-32601,"message":"Tool not found"}}
+        else:
+            resp = {"jsonrpc":"2.0","id":id_,"error":{"code":-32601,"message":"Method not found"}}
+
+        sys.stdout.write(json.dumps(resp)+"\n")
+        sys.stdout.flush()
+
+if __name__ == "__main__":
+    main()
