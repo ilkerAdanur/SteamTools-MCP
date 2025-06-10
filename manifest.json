@@ -1,6 +1,6 @@
 {
   "name": "steamtools-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "MCP server for fetching Steam Market item prices and price history",
   "entrypoint": "server.py",
   "language": "python",

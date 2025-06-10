@@ -90,6 +90,112 @@ Search for items in Steam market by name and get a list of matching items with p
 }
 ```
 
+### get_popular_items_24h
+
+Get most popular items in the last 24 hours by sales volume with current prices and sales data.
+
+**Parameters:**
+- `appid` (string, required): Steam application ID (e.g., '730' for CS:GO, '440' for TF2)
+- `max_results` (integer, optional): Maximum number of results to return (default: 10, max: 20)
+
+**Example Usage:**
+```json
+{
+  "appid": "730",
+  "max_results": 5
+}
+```
+
+**Response:**
+```json
+{
+  "appid": "730",
+  "period": "24_hours",
+  "type": "most_popular",
+  "results": [
+    {
+      "name": "AK-47 | Redline (Field-Tested)",
+      "current_price": "$51.59",
+      "sales_24h": "1,158",
+      "market_url": "https://steamcommunity.com/market/listings/730/AK-47%20%7C%20Redline%20(Field-Tested)",
+      "game": "Counter-Strike 2"
+    }
+  ],
+  "total_found": 5,
+  "status": "success"
+}
+```
+
+### get_most_expensive_sold_24h
+
+Get most expensive items sold in the last 24 hours with sale prices and times.
+
+**Parameters:**
+- `appid` (string, required): Steam application ID (e.g., '730' for CS:GO, '440' for TF2)
+- `max_results` (integer, optional): Maximum number of results to return (default: 10, max: 20)
+
+**Example Usage:**
+```json
+{
+  "appid": "730",
+  "max_results": 3
+}
+```
+
+**Response:**
+```json
+{
+  "appid": "730",
+  "period": "24_hours",
+  "type": "most_expensive_sold",
+  "results": [
+    {
+      "name": "★ Karambit | Fade (Factory New)",
+      "sale_price": "$2,450.00",
+      "sale_time": "2 hours ago",
+      "market_url": "https://steamcommunity.com/market/listings/730/★%20Karambit%20%7C%20Fade%20(Factory%20New)"
+    }
+  ],
+  "total_found": 3,
+  "status": "success"
+}
+```
+
+### get_most_expensive_sold_weekly
+
+Get most expensive items available for sale (weekly high-value items) with current prices.
+
+**Parameters:**
+- `appid` (string, required): Steam application ID (e.g., '730' for CS:GO, '440' for TF2)
+- `max_results` (integer, optional): Maximum number of results to return (default: 10, max: 20)
+
+**Example Usage:**
+```json
+{
+  "appid": "730",
+  "max_results": 3
+}
+```
+
+**Response:**
+```json
+{
+  "appid": "730",
+  "period": "weekly",
+  "type": "most_expensive_available",
+  "results": [
+    {
+      "name": "★ Karambit | Case Hardened (Factory New)",
+      "current_price": "$15,000.00",
+      "quantity_available": "1",
+      "market_url": "https://steamcommunity.com/market/listings/730/★%20Karambit%20%7C%20Case%20Hardened%20(Factory%20New)"
+    }
+  ],
+  "total_found": 3,
+  "status": "success"
+}
+```
+
 ## Installation
 
 1. Install dependencies:
