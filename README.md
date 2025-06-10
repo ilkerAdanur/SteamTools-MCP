@@ -92,11 +92,16 @@ Search for items in Steam market by name and get a list of matching items with p
 
 ### get_popular_items_24h
 
-Get most popular items in the last 24 hours by sales volume with current prices and sales data.
+Get most popular items in the last 24 hours by analyzing sales volume from known popular items.
 
 **Parameters:**
 - `appid` (string, required): Steam application ID (e.g., '730' for CS:GO, '440' for TF2)
 - `max_results` (integer, optional): Maximum number of results to return (default: 10, max: 20)
+
+**Supported Games:**
+- `730`: Counter-Strike 2 (CS:GO)
+- `440`: Team Fortress 2
+- `570`: Dota 2
 
 **Example Usage:**
 ```json
@@ -111,28 +116,35 @@ Get most popular items in the last 24 hours by sales volume with current prices 
 {
   "appid": "730",
   "period": "24_hours",
-  "type": "most_popular",
+  "type": "most_popular_by_sales",
   "results": [
     {
       "name": "AK-47 | Redline (Field-Tested)",
       "current_price": "$51.59",
-      "sales_24h": "1,158",
-      "market_url": "https://steamcommunity.com/market/listings/730/AK-47%20%7C%20Redline%20(Field-Tested)",
-      "game": "Counter-Strike 2"
+      "sales_24h": 117,
+      "total_sales": 2450,
+      "market_url": "https://steamcommunity.com/market/listings/730/AK-47%20%7C%20Redline%20(Field-Tested)"
     }
   ],
+  "total_analyzed": 15,
   "total_found": 5,
-  "status": "success"
+  "status": "success",
+  "note": "Based on sales volume analysis of known popular items"
 }
 ```
 
 ### get_most_expensive_sold_24h
 
-Get most expensive items sold in the last 24 hours with sale prices and times.
+Get most expensive items sold in the last 24 hours by analyzing high-value items.
 
 **Parameters:**
 - `appid` (string, required): Steam application ID (e.g., '730' for CS:GO, '440' for TF2)
 - `max_results` (integer, optional): Maximum number of results to return (default: 10, max: 20)
+
+**Supported Games:**
+- `730`: Counter-Strike 2 (CS:GO)
+- `440`: Team Fortress 2
+- `570`: Dota 2
 
 **Example Usage:**
 ```json
@@ -151,23 +163,31 @@ Get most expensive items sold in the last 24 hours with sale prices and times.
   "results": [
     {
       "name": "★ Karambit | Fade (Factory New)",
-      "sale_price": "$2,450.00",
-      "sale_time": "2 hours ago",
+      "current_price": "$2,450.00",
+      "highest_sale_24h": "$2,650.00",
+      "recent_sales_count": 3,
       "market_url": "https://steamcommunity.com/market/listings/730/★%20Karambit%20%7C%20Fade%20(Factory%20New)"
     }
   ],
+  "total_analyzed": 15,
   "total_found": 3,
-  "status": "success"
+  "status": "success",
+  "note": "Based on price analysis of known high-value items"
 }
 ```
 
 ### get_most_expensive_sold_weekly
 
-Get most expensive items available for sale (weekly high-value items) with current prices.
+Get most expensive items available for sale (weekly high-value items) with comprehensive price analysis.
 
 **Parameters:**
 - `appid` (string, required): Steam application ID (e.g., '730' for CS:GO, '440' for TF2)
 - `max_results` (integer, optional): Maximum number of results to return (default: 10, max: 20)
+
+**Supported Games:**
+- `730`: Counter-Strike 2 (CS:GO)
+- `440`: Team Fortress 2
+- `570`: Dota 2
 
 **Example Usage:**
 ```json
@@ -188,11 +208,16 @@ Get most expensive items available for sale (weekly high-value items) with curre
       "name": "★ Karambit | Case Hardened (Factory New)",
       "current_price": "$15,000.00",
       "quantity_available": "1",
+      "weekly_sales": 2,
+      "highest_weekly_price": "$16,500.00",
+      "average_weekly_price": "$15,750.00",
       "market_url": "https://steamcommunity.com/market/listings/730/★%20Karambit%20%7C%20Case%20Hardened%20(Factory%20New)"
     }
   ],
+  "total_analyzed": 20,
   "total_found": 3,
-  "status": "success"
+  "status": "success",
+  "note": "Based on weekly price analysis of ultra high-value items"
 }
 ```
 
