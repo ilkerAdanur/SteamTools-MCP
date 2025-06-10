@@ -1,0 +1,24 @@
+{
+  "functions": [
+    {
+      "name": "get_item_data",
+      "description": "Fetches current price and last 10 days' price data from Steam Market",
+      "input": {
+        "appid": "string",
+        "item_name": "string"
+      },
+      "output": {
+        "item_name": "string",
+        "appid": "string",
+        "current_price": "string",
+        "last_10_days_prices": [
+          {
+            "date": "string",
+            "price": "string",
+            "sales": "integer"
+          }
+        ]
+      }
+    }
+  ]
+}
