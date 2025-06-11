@@ -92,16 +92,16 @@ Search for items in Steam market by name and get a list of matching items with p
 
 ### get_popular_items_24h
 
-Get most popular items in the last 24 hours by analyzing sales volume from known popular items.
+Get most popular items in the last 24 hours by scanning the entire Steam market and analyzing real sales volume.
 
 **Parameters:**
 - `appid` (string, required): Steam application ID (e.g., '730' for CS:GO, '440' for TF2)
 - `max_results` (integer, optional): Maximum number of results to return (default: 10, max: 20)
 
-**Supported Games:**
-- `730`: Counter-Strike 2 (CS:GO)
-- `440`: Team Fortress 2
-- `570`: Dota 2
+**How it works:**
+1. Scans first 500 items from Steam Market (sorted by quantity/activity)
+2. Analyzes sales data for top 100 most active items
+3. Returns items with highest 24-hour sales volume
 
 **Example Usage:**
 ```json
@@ -116,35 +116,37 @@ Get most popular items in the last 24 hours by analyzing sales volume from known
 {
   "appid": "730",
   "period": "24_hours",
-  "type": "most_popular_by_sales",
+  "type": "market_scan_popular",
   "results": [
     {
       "name": "AK-47 | Redline (Field-Tested)",
       "current_price": "$51.59",
+      "quantity_available": "1,158",
       "sales_24h": 117,
       "total_sales": 2450,
       "market_url": "https://steamcommunity.com/market/listings/730/AK-47%20%7C%20Redline%20(Field-Tested)"
     }
   ],
-  "total_analyzed": 15,
+  "total_scanned": 500,
+  "total_analyzed": 100,
   "total_found": 5,
   "status": "success",
-  "note": "Based on sales volume analysis of known popular items"
+  "note": "Based on comprehensive Steam Market scan and sales volume analysis"
 }
 ```
 
 ### get_most_expensive_sold_24h
 
-Get most expensive items sold in the last 24 hours by analyzing high-value items.
+Get most expensive items sold in the last 24 hours by scanning high-value market items and analyzing real sales data.
 
 **Parameters:**
 - `appid` (string, required): Steam application ID (e.g., '730' for CS:GO, '440' for TF2)
 - `max_results` (integer, optional): Maximum number of results to return (default: 10, max: 20)
 
-**Supported Games:**
-- `730`: Counter-Strike 2 (CS:GO)
-- `440`: Team Fortress 2
-- `570`: Dota 2
+**How it works:**
+1. Scans first 250 items from Steam Market (sorted by price descending)
+2. Filters items worth $10+ and analyzes top 50 most expensive
+3. Returns items with highest 24-hour sale prices
 
 **Example Usage:**
 ```json
@@ -159,7 +161,7 @@ Get most expensive items sold in the last 24 hours by analyzing high-value items
 {
   "appid": "730",
   "period": "24_hours",
-  "type": "most_expensive_sold",
+  "type": "market_scan_expensive",
   "results": [
     {
       "name": "★ Karambit | Fade (Factory New)",
@@ -169,10 +171,11 @@ Get most expensive items sold in the last 24 hours by analyzing high-value items
       "market_url": "https://steamcommunity.com/market/listings/730/★%20Karambit%20%7C%20Fade%20(Factory%20New)"
     }
   ],
-  "total_analyzed": 15,
+  "total_scanned": 250,
+  "total_analyzed": 50,
   "total_found": 3,
   "status": "success",
-  "note": "Based on price analysis of known high-value items"
+  "note": "Based on comprehensive Steam Market scan for high-value sales"
 }
 ```
 

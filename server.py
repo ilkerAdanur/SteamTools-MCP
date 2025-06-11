@@ -238,315 +238,405 @@ def search_steam_items(appid, search_term, max_results=10):
         }
 
 def get_popular_items_24h(appid, max_results=10):
-    """Get most popular items in the last 24 hours by analyzing sales volume from known popular items"""
+    """Get most popular items in the last 24 hours using hybrid approach: market scan + known items"""
 
-    # Define popular items for different games
-    popular_items_db = {
-        "730": [  # CS:GO/CS2
+    # Define seed items for faster analysis (most commonly traded items)
+    seed_items_db = {
+        "730": [  # CS:GO/CS2 - Most traded items
             "AK-47 | Redline (Field-Tested)",
-            "AWP | Dragon Lore (Factory New)",
-            "M4A4 | Howl (Factory New)",
-            "AK-47 | Fire Serpent (Factory New)",
-            "Glock-18 | Fade (Factory New)",
-            "USP-S | Kill Confirmed (Factory New)",
-            "M4A1-S | Hot Rod (Factory New)",
-            "Desert Eagle | Blaze (Factory New)",
-            "AK-47 | Case Hardened (Factory New)",
-            "AWP | Medusa (Factory New)",
-            "M4A4 | Poseidon (Factory New)",
-            "AK-47 | Vulcan (Factory New)",
+            "AWP | Asiimov (Field-Tested)",
+            "M4A4 | Asiimov (Field-Tested)",
+            "AK-47 | Vulcan (Field-Tested)",
             "AWP | Lightning Strike (Factory New)",
             "M4A1-S | Icarus Fell (Factory New)",
-            "Glock-18 | Water Elemental (Factory New)"
+            "Glock-18 | Water Elemental (Factory New)",
+            "USP-S | Orion (Factory New)",
+            "AK-47 | Case Hardened (Field-Tested)",
+            "Desert Eagle | Blaze (Factory New)",
+            "M4A4 | Dragon King (Factory New)",
+            "AWP | Hyper Beast (Field-Tested)",
+            "AK-47 | Frontside Misty (Factory New)",
+            "M4A1-S | Cyrex (Factory New)",
+            "AWP | Electric Hive (Factory New)"
         ],
         "440": [  # TF2
-            "Unusual Team Captain",
-            "Australium Rocket Launcher",
-            "Strange Professional Killstreak Rocket Launcher",
-            "Unusual Burning Flames Team Captain",
-            "Golden Frying Pan"
+            "Mann Co. Supply Crate Key",
+            "Refined Metal",
+            "Scrap Metal",
+            "Reclaimed Metal",
+            "Strange Part"
         ],
         "570": [  # Dota 2
-            "Dragonclaw Hook",
-            "Timebreaker",
-            "Stache",
-            "Alpine Stalker's Hat"
+            "Immortal Treasure",
+            "Arcana",
+            "Immortal"
         ]
     }
 
-    items_to_check = popular_items_db.get(appid, [])
-    if not items_to_check:
-        return {
-            "error": f"No popular items database available for appid {appid}",
-            "appid": appid,
-            "supported_games": list(popular_items_db.keys())
-        }
-
-    results = []
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
         "Accept-Language": "en-US,en;q=0.5",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": f"https://steamcommunity.com/market/search?appid={appid}"
     }
 
     session = requests.Session()
     session.headers.update(headers)
 
-    for item_name in items_to_check[:max_results * 2]:  # Check more items than needed
-        try:
-            # Get item data including sales volume
+    all_items = []
+    items_with_sales = []
+
+    try:
+        # Step 1: Quick market scan for discovery (limited to avoid rate limits)
+        print(f"Quick scanning Steam Market for appid {appid}...")
+
+        search_url = f"https://steamcommunity.com/market/search/render/"
+        params = {
+            'query': '',
+            'start': 0,
+            'count': 100,  # Get top 100 items
+            'search_descriptions': 0,
+            'sort_column': 'quantity',  # Sort by quantity to get active items
+            'sort_dir': 'desc',
+            'appid': appid,
+            'norender': 1
+        }
+
+        response = session.get(search_url, params=params, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success') and data.get('results_html'):
+                soup = BeautifulSoup(data['results_html'], 'html.parser')
+                items = soup.find_all('a', class_='market_listing_row_link')
+
+                for item in items:
+                    try:
+                        # Extract item name
+                        name_elem = item.find('span', class_='market_listing_item_name')
+                        item_name = name_elem.text.strip() if name_elem else None
+
+                        # Extract current price
+                        price_elem = item.find('span', class_='normal_price')
+                        if not price_elem:
+                            price_elem = item.find('span', class_='sale_price')
+                        current_price = price_elem.text.strip() if price_elem else "N/A"
+
+                        # Extract quantity available
+                        qty_elem = item.find('span', class_='market_listing_num_listings_qty')
+                        quantity = qty_elem.text.strip() if qty_elem else "0"
+
+                        # Extract item URL
+                        item_url = item.get('href', '')
+
+                        if item_name and quantity != "0":
+                            all_items.append({
+                                "name": item_name,
+                                "current_price": current_price,
+                                "quantity_available": quantity,
+                                "market_url": item_url
+                            })
+
+                    except Exception as e:
+                        continue
+
+        # Step 2: Add seed items to ensure we have good candidates
+        seed_items = seed_items_db.get(appid, [])
+        for item_name in seed_items:
             import urllib.parse
             encoded_item_name = urllib.parse.quote(item_name)
             item_url = f"https://steamcommunity.com/market/listings/{appid}/{encoded_item_name}"
 
-            response = session.get(item_url, timeout=10)
-            if response.status_code != 200:
-                continue
-
-            soup = BeautifulSoup(response.text, "html.parser")
-
-            # Get current price
-            current_price = "N/A"
-            price_selectors = [
-                "span.market_listing_price.market_listing_price_with_fee",
-                "span.market_listing_price_with_fee",
-                "span.market_listing_price"
-            ]
-
-            for selector in price_selectors:
-                price_span = soup.select_one(selector)
-                if price_span and price_span.text.strip():
-                    current_price = price_span.text.strip()
-                    break
-
-            # Extract sales data from JavaScript
-            sales_24h = 0
-            total_sales = 0
-
-            # Try to find price history data
-            js_patterns = [
-                r"var line1=(\[.*?\]);",
-                r"line1=(\[.*?\]);",
-                r'"line1":(\[.*?\])'
-            ]
-
-            for pattern in js_patterns:
-                match = re.search(pattern, response.text)
-                if match:
-                    try:
-                        data = json.loads(match.group(1))
-                        # Calculate sales in last 24 hours (last few data points)
-                        recent_data = data[-24:] if len(data) >= 24 else data
-                        for entry in recent_data:
-                            if len(entry) >= 3:
-                                sales_24h += int(entry[2]) if str(entry[2]).isdigit() else 0
-
-                        # Calculate total sales
-                        for entry in data:
-                            if len(entry) >= 3:
-                                total_sales += int(entry[2]) if str(entry[2]).isdigit() else 0
-                        break
-                    except Exception:
-                        continue
-
-            # Only include items with sales data
-            if sales_24h > 0 or current_price != "N/A":
-                results.append({
+            # Check if not already in list
+            if not any(item['name'] == item_name for item in all_items):
+                all_items.append({
                     "name": item_name,
-                    "current_price": current_price,
-                    "sales_24h": sales_24h,
-                    "total_sales": total_sales,
-                    "market_url": item_url,
-                    "popularity_score": sales_24h * 10 + (total_sales // 100)  # Custom popularity metric
+                    "current_price": "N/A",
+                    "quantity_available": "Unknown",
+                    "market_url": item_url
                 })
 
-        except Exception as e:
-            continue
+        print(f"Found {len(all_items)} items to analyze. Checking sales data...")
 
-    # Sort by popularity (sales volume in 24h)
-    results.sort(key=lambda x: x['popularity_score'], reverse=True)
+        # Step 3: Analyze sales data for top items (limited to avoid timeouts)
+        items_to_analyze = all_items[:30]  # Analyze top 30 items only
 
-    # Remove popularity_score from final results and limit to max_results
-    final_results = []
-    for item in results[:max_results]:
-        final_item = {k: v for k, v in item.items() if k != 'popularity_score'}
-        final_results.append(final_item)
+        for i, item in enumerate(items_to_analyze):
+            try:
+                print(f"Analyzing item {i+1}/{len(items_to_analyze)}: {item['name'][:50]}...")
 
-    return {
-        "appid": appid,
-        "period": "24_hours",
-        "type": "most_popular_by_sales",
-        "results": final_results,
-        "total_analyzed": len(items_to_check),
-        "total_found": len(final_results),
-        "status": "success",
-        "note": "Based on sales volume analysis of known popular items"
-    }
+                # Get detailed sales data from item page
+                response = session.get(item['market_url'], timeout=8)
+                if response.status_code != 200:
+                    continue
+
+                # Update current price if not available
+                if item['current_price'] == "N/A":
+                    soup = BeautifulSoup(response.text, "html.parser")
+                    price_selectors = [
+                        "span.market_listing_price.market_listing_price_with_fee",
+                        "span.market_listing_price_with_fee",
+                        "span.market_listing_price"
+                    ]
+
+                    for selector in price_selectors:
+                        price_span = soup.select_one(selector)
+                        if price_span and price_span.text.strip():
+                            item['current_price'] = price_span.text.strip()
+                            break
+
+                # Extract sales data from JavaScript
+                sales_24h = 0
+                total_sales = 0
+
+                # Try to find price history data
+                js_patterns = [
+                    r"var line1=(\[.*?\]);",
+                    r"line1=(\[.*?\]);",
+                    r'"line1":(\[.*?\])'
+                ]
+
+                for pattern in js_patterns:
+                    match = re.search(pattern, response.text)
+                    if match:
+                        try:
+                            data = json.loads(match.group(1))
+                            # Calculate sales in last 24 hours (last 24 data points)
+                            recent_data = data[-24:] if len(data) >= 24 else data
+                            for entry in recent_data:
+                                if len(entry) >= 3:
+                                    sales_24h += int(entry[2]) if str(entry[2]).isdigit() else 0
+
+                            # Calculate total sales
+                            for entry in data:
+                                if len(entry) >= 3:
+                                    total_sales += int(entry[2]) if str(entry[2]).isdigit() else 0
+                            break
+                        except Exception:
+                            continue
+
+                # Include items with sales data
+                if sales_24h > 0 or item['current_price'] != "N/A":
+                    items_with_sales.append({
+                        "name": item['name'],
+                        "current_price": item['current_price'],
+                        "quantity_available": item['quantity_available'],
+                        "sales_24h": sales_24h,
+                        "total_sales": total_sales,
+                        "market_url": item['market_url'],
+                        "popularity_score": sales_24h * 100 + (total_sales // 1000)  # Weighted popularity
+                    })
+
+                # Add delay to avoid rate limiting
+                import time
+                time.sleep(0.5)
+
+            except Exception as e:
+                continue
+
+        # Step 4: Sort by sales volume and return top results
+        items_with_sales.sort(key=lambda x: x['popularity_score'], reverse=True)
+
+        # Remove popularity_score from final results
+        final_results = []
+        for item in items_with_sales[:max_results]:
+            final_item = {k: v for k, v in item.items() if k != 'popularity_score'}
+            final_results.append(final_item)
+
+        return {
+            "appid": appid,
+            "period": "24_hours",
+            "type": "hybrid_scan_popular",
+            "results": final_results,
+            "total_scanned": len(all_items),
+            "total_analyzed": len(items_to_analyze),
+            "total_found": len(final_results),
+            "status": "success",
+            "note": "Based on hybrid market scan and sales volume analysis"
+        }
+
+    except Exception as e:
+        return {
+            "error": f"Hybrid scan failed: {str(e)}",
+            "appid": appid,
+            "total_scanned": len(all_items),
+            "status": "error"
+        }
 
 def get_most_expensive_sold_24h(appid, max_results=10):
-    """Get most expensive items sold in the last 24 hours by analyzing high-value items"""
+    """Get most expensive items sold in the last 24 hours by scanning high-value market items"""
 
-    # Define high-value items for different games
-    expensive_items_db = {
-        "730": [  # CS:GO/CS2 - High value items
-            "★ Karambit | Fade (Factory New)",
-            "★ M9 Bayonet | Crimson Web (Factory New)",
-            "★ Karambit | Case Hardened (Factory New)",
-            "AWP | Dragon Lore (Factory New)",
-            "M4A4 | Howl (Factory New)",
-            "AK-47 | Fire Serpent (Factory New)",
-            "★ Butterfly Knife | Fade (Factory New)",
-            "★ Karambit | Doppler (Factory New)",
-            "★ Bayonet | Crimson Web (Factory New)",
-            "★ Flip Knife | Gamma Doppler (Factory New)",
-            "★ Gut Knife | Marble Fade (Factory New)",
-            "★ Huntsman Knife | Fade (Factory New)",
-            "★ Shadow Daggers | Fade (Factory New)",
-            "★ Bowie Knife | Case Hardened (Factory New)",
-            "★ Falchion Knife | Fade (Factory New)"
-        ],
-        "440": [  # TF2
-            "Golden Frying Pan",
-            "Unusual Burning Flames Team Captain",
-            "Unusual Scorching Flames Team Captain",
-            "Australium Rocket Launcher",
-            "Unusual Sunbeams Team Captain"
-        ],
-        "570": [  # Dota 2
-            "Dragonclaw Hook",
-            "Timebreaker",
-            "Stache",
-            "Alpine Stalker's Hat",
-            "Ethereal Flames War Dog"
-        ]
-    }
-
-    items_to_check = expensive_items_db.get(appid, [])
-    if not items_to_check:
-        return {
-            "error": f"No expensive items database available for appid {appid}",
-            "appid": appid,
-            "supported_games": list(expensive_items_db.keys())
-        }
-
-    results = []
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
         "Accept-Language": "en-US,en;q=0.5",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": f"https://steamcommunity.com/market/search?appid={appid}"
     }
 
     session = requests.Session()
     session.headers.update(headers)
 
-    for item_name in items_to_check:
-        try:
-            # Get item data including recent sales
-            import urllib.parse
-            encoded_item_name = urllib.parse.quote(item_name)
-            item_url = f"https://steamcommunity.com/market/listings/{appid}/{encoded_item_name}"
+    all_items = []
+    expensive_sales = []
 
-            response = session.get(item_url, timeout=10)
+    try:
+        # Step 1: Scan market for high-value items (sorted by price descending)
+        print(f"Scanning Steam Market for expensive items in appid {appid}...")
+
+        for page in range(0, 5):  # Scan first 5 pages of most expensive items
+            start_index = page * 50
+            search_url = f"https://steamcommunity.com/market/search/render/"
+            params = {
+                'query': '',
+                'start': start_index,
+                'count': 50,
+                'search_descriptions': 0,
+                'sort_column': 'price',  # Sort by price to get expensive items
+                'sort_dir': 'desc',
+                'appid': appid,
+                'norender': 1
+            }
+
+            response = session.get(search_url, params=params, timeout=10)
             if response.status_code != 200:
+                break
+
+            data = response.json()
+            if not data.get('success') or not data.get('results_html'):
+                break
+
+            soup = BeautifulSoup(data['results_html'], 'html.parser')
+            items = soup.find_all('a', class_='market_listing_row_link')
+
+            if not items:  # No more items
+                break
+
+            for item in items:
+                try:
+                    # Extract item name
+                    name_elem = item.find('span', class_='market_listing_item_name')
+                    item_name = name_elem.text.strip() if name_elem else None
+
+                    # Extract current price
+                    price_elem = item.find('span', class_='normal_price')
+                    if not price_elem:
+                        price_elem = item.find('span', class_='sale_price')
+                    current_price = price_elem.text.strip() if price_elem else "N/A"
+
+                    # Extract item URL
+                    item_url = item.get('href', '')
+
+                    # Only consider items with significant prices
+                    if item_name and current_price != "N/A":
+                        # Extract numeric price for filtering
+                        price_match = re.search(r'[\d,]+\.?\d*', current_price.replace(',', ''))
+                        if price_match:
+                            price_value = float(price_match.group().replace(',', ''))
+                            if price_value >= 10:  # Only items worth $10 or more
+                                all_items.append({
+                                    "name": item_name,
+                                    "current_price": current_price,
+                                    "price_value": price_value,
+                                    "market_url": item_url
+                                })
+
+                except Exception as e:
+                    continue
+
+            # Add small delay to avoid rate limiting
+            import time
+            time.sleep(0.5)
+
+        print(f"Found {len(all_items)} expensive items. Analyzing recent sales...")
+
+        # Step 2: Analyze recent sales for expensive items
+        for i, item in enumerate(all_items[:50]):  # Analyze top 50 most expensive items
+            try:
+                print(f"Analyzing expensive item {i+1}/50: {item['name'][:50]}...")
+
+                # Get detailed sales data from item page
+                response = session.get(item['market_url'], timeout=8)
+                if response.status_code != 200:
+                    continue
+
+                # Extract recent sales data from JavaScript
+                highest_sale_24h = 0
+                recent_sales_count = 0
+
+                # Try to find price history data
+                js_patterns = [
+                    r"var line1=(\[.*?\]);",
+                    r"line1=(\[.*?\]);",
+                    r'"line1":(\[.*?\])'
+                ]
+
+                for pattern in js_patterns:
+                    match = re.search(pattern, response.text)
+                    if match:
+                        try:
+                            data = json.loads(match.group(1))
+                            # Get recent sales (last 24 hours worth of data)
+                            recent_data = data[-24:] if len(data) >= 24 else data
+
+                            for entry in recent_data:
+                                if len(entry) >= 3:
+                                    price = float(entry[1]) if isinstance(entry[1], (int, float)) else 0
+                                    volume = int(entry[2]) if str(entry[2]).isdigit() else 0
+
+                                    if price > 0 and volume > 0:
+                                        recent_sales_count += volume
+                                        if price > highest_sale_24h:
+                                            highest_sale_24h = price
+                            break
+                        except Exception:
+                            continue
+
+                # Include items with recent sales or high current price
+                if highest_sale_24h > 0 or item['price_value'] >= 50:
+                    expensive_sales.append({
+                        "name": item['name'],
+                        "current_price": item['current_price'],
+                        "highest_sale_24h": f"${highest_sale_24h:.2f}" if highest_sale_24h > 0 else "No recent sales",
+                        "recent_sales_count": recent_sales_count,
+                        "market_url": item['market_url'],
+                        "price_value": max(highest_sale_24h, item['price_value'])
+                    })
+
+                # Add delay to avoid rate limiting
+                time.sleep(0.3)
+
+            except Exception as e:
                 continue
 
-            soup = BeautifulSoup(response.text, "html.parser")
+        # Step 3: Sort by highest sale price and return top results
+        expensive_sales.sort(key=lambda x: x['price_value'], reverse=True)
 
-            # Get current price
-            current_price = "N/A"
-            price_selectors = [
-                "span.market_listing_price.market_listing_price_with_fee",
-                "span.market_listing_price_with_fee",
-                "span.market_listing_price"
-            ]
+        # Remove price_value from final results
+        final_results = []
+        for item in expensive_sales[:max_results]:
+            final_item = {k: v for k, v in item.items() if k != 'price_value'}
+            final_results.append(final_item)
 
-            for selector in price_selectors:
-                price_span = soup.select_one(selector)
-                if price_span and price_span.text.strip():
-                    current_price = price_span.text.strip()
-                    break
+        return {
+            "appid": appid,
+            "period": "24_hours",
+            "type": "market_scan_expensive",
+            "results": final_results,
+            "total_scanned": len(all_items),
+            "total_analyzed": min(50, len(all_items)),
+            "total_found": len(final_results),
+            "status": "success",
+            "note": "Based on comprehensive Steam Market scan for high-value sales"
+        }
 
-            # Extract recent sales data from JavaScript
-            recent_sales = []
-            highest_sale_24h = 0
-
-            # Try to find price history data
-            js_patterns = [
-                r"var line1=(\[.*?\]);",
-                r"line1=(\[.*?\]);",
-                r'"line1":(\[.*?\])'
-            ]
-
-            for pattern in js_patterns:
-                match = re.search(pattern, response.text)
-                if match:
-                    try:
-                        data = json.loads(match.group(1))
-                        # Get recent sales (last 24 hours worth of data)
-                        recent_data = data[-24:] if len(data) >= 24 else data
-
-                        for entry in recent_data:
-                            if len(entry) >= 2:
-                                price = float(entry[1]) if isinstance(entry[1], (int, float)) else 0
-                                if price > highest_sale_24h:
-                                    highest_sale_24h = price
-
-                        # Get the most recent sale info
-                        if recent_data:
-                            latest_entry = recent_data[-1]
-                            if len(latest_entry) >= 3:
-                                recent_sales.append({
-                                    "price": latest_entry[1],
-                                    "volume": latest_entry[2] if len(latest_entry) > 2 else 0,
-                                    "date": latest_entry[0] if len(latest_entry) > 0 else "Unknown"
-                                })
-                        break
-                    except Exception:
-                        continue
-
-            # Only include items with price data
-            if current_price != "N/A" or highest_sale_24h > 0:
-                # Extract numeric value for sorting
-                price_value = 0
-                if current_price != "N/A":
-                    price_match = re.search(r'[\d,]+\.?\d*', current_price.replace(',', ''))
-                    if price_match:
-                        price_value = float(price_match.group().replace(',', ''))
-
-                if highest_sale_24h > 0:
-                    price_value = max(price_value, highest_sale_24h)
-
-                results.append({
-                    "name": item_name,
-                    "current_price": current_price,
-                    "highest_sale_24h": f"${highest_sale_24h:.2f}" if highest_sale_24h > 0 else "No recent sales",
-                    "recent_sales_count": len(recent_sales),
-                    "market_url": item_url,
-                    "price_value": price_value
-                })
-
-        except Exception as e:
-            continue
-
-    # Sort by price value (highest first)
-    results.sort(key=lambda x: x['price_value'], reverse=True)
-
-    # Remove price_value from final results and limit to max_results
-    final_results = []
-    for item in results[:max_results]:
-        final_item = {k: v for k, v in item.items() if k != 'price_value'}
-        final_results.append(final_item)
-
-    return {
-        "appid": appid,
-        "period": "24_hours",
-        "type": "most_expensive_sold",
-        "results": final_results,
-        "total_analyzed": len(items_to_check),
-        "total_found": len(final_results),
-        "status": "success",
-        "note": "Based on price analysis of known high-value items"
-    }
+    except Exception as e:
+        return {
+            "error": f"Expensive items scan failed: {str(e)}",
+            "appid": appid,
+            "total_scanned": len(all_items),
+            "status": "error"
+        }
 
 def get_most_expensive_sold_weekly(appid, max_results=10):
     """Get most expensive items available for sale (weekly high-value items) with current prices"""
