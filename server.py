@@ -3,6 +3,56 @@ import json
 import requests
 from bs4 import BeautifulSoup
 import re
+import time
+from datetime import datetime, timedelta
+
+# Global cache for storing results
+_cache = {}
+_last_request_time = {}
+
+def get_cache_key(func_name, appid, **kwargs):
+    """Generate cache key for function calls"""
+    key_parts = [func_name, appid]
+    for k, v in sorted(kwargs.items()):
+        key_parts.append(f"{k}={v}")
+    return "|".join(key_parts)
+
+def is_cache_valid(cache_key, cache_duration_minutes=10):
+    """Check if cached data is still valid"""
+    if cache_key not in _cache:
+        return False
+
+    cached_time = _cache[cache_key].get('timestamp')
+    if not cached_time:
+        return False
+
+    cache_age = datetime.now() - cached_time
+    return cache_age < timedelta(minutes=cache_duration_minutes)
+
+def get_cached_result(cache_key):
+    """Get cached result if valid"""
+    if is_cache_valid(cache_key):
+        return _cache[cache_key]['data']
+    return None
+
+def set_cached_result(cache_key, data):
+    """Store result in cache"""
+    _cache[cache_key] = {
+        'data': data,
+        'timestamp': datetime.now()
+    }
+
+def rate_limit_delay(min_delay=1.0):
+    """Implement rate limiting between requests"""
+    current_time = time.time()
+    last_time = _last_request_time.get('steam', 0)
+
+    time_since_last = current_time - last_time
+    if time_since_last < min_delay:
+        sleep_time = min_delay - time_since_last
+        time.sleep(sleep_time)
+
+    _last_request_time['steam'] = time.time()
 
 def fetch_item_data(appid, item_name):
     """Fetch Steam market item data including current price and price history"""
@@ -240,6 +290,13 @@ def search_steam_items(appid, search_term, max_results=10):
 def get_popular_items_24h(appid, max_results=10):
     """Get most popular items in the last 24 hours using hybrid approach: market scan + known items"""
 
+    # Check cache first
+    cache_key = get_cache_key("get_popular_items_24h", appid, max_results=max_results)
+    cached_result = get_cached_result(cache_key)
+    if cached_result:
+        cached_result['note'] = cached_result.get('note', '') + ' (cached result)'
+        return cached_result
+
     # Define seed items for faster analysis (most commonly traded items)
     seed_items_db = {
         "730": [  # CS:GO/CS2 - Most traded items
@@ -428,8 +485,7 @@ def get_popular_items_24h(appid, max_results=10):
                     })
 
                 # Add delay to avoid rate limiting
-                import time
-                time.sleep(0.5)
+                rate_limit_delay(1.0)
 
             except Exception as e:
                 continue
@@ -443,7 +499,7 @@ def get_popular_items_24h(appid, max_results=10):
             final_item = {k: v for k, v in item.items() if k != 'popularity_score'}
             final_results.append(final_item)
 
-        return {
+        result = {
             "appid": appid,
             "period": "24_hours",
             "type": "hybrid_scan_popular",
@@ -455,16 +511,29 @@ def get_popular_items_24h(appid, max_results=10):
             "note": "Based on hybrid market scan and sales volume analysis"
         }
 
+        # Cache the result
+        set_cached_result(cache_key, result)
+        return result
+
     except Exception as e:
-        return {
+        error_result = {
             "error": f"Hybrid scan failed: {str(e)}",
             "appid": appid,
             "total_scanned": len(all_items),
             "status": "error"
         }
+        # Don't cache error results
+        return error_result
 
 def get_most_expensive_sold_24h(appid, max_results=10):
     """Get most expensive items sold in the last 24 hours by analyzing known high-value items"""
+
+    # Check cache first
+    cache_key = get_cache_key("get_most_expensive_sold_24h", appid, max_results=max_results)
+    cached_result = get_cached_result(cache_key)
+    if cached_result:
+        cached_result['note'] = cached_result.get('note', '') + ' (cached result)'
+        return cached_result
 
     # Define comprehensive high-value items database
     expensive_items_db = {
@@ -636,8 +705,7 @@ def get_most_expensive_sold_24h(appid, max_results=10):
                     })
 
                 # Add delay to avoid rate limiting
-                import time
-                time.sleep(0.5)
+                rate_limit_delay(1.0)
 
             except Exception as e:
                 print(f"Error analyzing {item_name}: {str(e)}")
@@ -652,7 +720,7 @@ def get_most_expensive_sold_24h(appid, max_results=10):
             final_item = {k: v for k, v in item.items() if k != 'price_value'}
             final_results.append(final_item)
 
-        return {
+        result = {
             "appid": appid,
             "period": "24_hours",
             "type": "expensive_items_analysis",
@@ -662,6 +730,10 @@ def get_most_expensive_sold_24h(appid, max_results=10):
             "status": "success",
             "note": "Based on analysis of known high-value items with real sales data"
         }
+
+        # Cache the result
+        set_cached_result(cache_key, result)
+        return result
 
     except Exception as e:
         return {
@@ -673,6 +745,13 @@ def get_most_expensive_sold_24h(appid, max_results=10):
 
 def get_most_expensive_sold_weekly(appid, max_results=10):
     """Get most expensive items available for sale (weekly high-value items) with current prices"""
+
+    # Check cache first (longer cache for weekly data)
+    cache_key = get_cache_key("get_most_expensive_sold_weekly", appid, max_results=max_results)
+    cached_result = get_cached_result(cache_key)
+    if cached_result:
+        cached_result['note'] = cached_result.get('note', '') + ' (cached result)'
+        return cached_result
 
     # Define ultra high-value items for different games
     ultra_expensive_items_db = {
@@ -850,7 +929,7 @@ def get_most_expensive_sold_weekly(appid, max_results=10):
         final_item = {k: v for k, v in item.items() if k != 'price_value'}
         final_results.append(final_item)
 
-    return {
+    result = {
         "appid": appid,
         "period": "weekly",
         "type": "most_expensive_available",
@@ -860,6 +939,10 @@ def get_most_expensive_sold_weekly(appid, max_results=10):
         "status": "success",
         "note": "Based on weekly price analysis of ultra high-value items"
     }
+
+    # Cache the result (longer cache for weekly data)
+    set_cached_result(cache_key, result)
+    return result
 
 def main():
     """Main MCP server loop"""
