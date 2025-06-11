@@ -137,16 +137,21 @@ Get most popular items in the last 24 hours by scanning the entire Steam market 
 
 ### get_most_expensive_sold_24h
 
-Get most expensive items sold in the last 24 hours by scanning high-value market items and analyzing real sales data.
+Get most expensive items sold in the last 24 hours by analyzing known high-value items with real sales data.
 
 **Parameters:**
 - `appid` (string, required): Steam application ID (e.g., '730' for CS:GO, '440' for TF2)
 - `max_results` (integer, optional): Maximum number of results to return (default: 10, max: 20)
 
 **How it works:**
-1. Scans first 250 items from Steam Market (sorted by price descending)
-2. Filters items worth $10+ and analyzes top 50 most expensive
-3. Returns items with highest 24-hour sale prices
+1. Analyzes comprehensive database of high-value items (knives, rare skins, etc.)
+2. Extracts real sales data from each item's market page
+3. Returns items with highest 24-hour sale prices and volumes
+
+**Supported Games:**
+- `730`: CS:GO/CS2 (30 high-value items including knives, gloves, rare skins)
+- `440`: TF2 (10 high-value items including unusuals, australiums)
+- `570`: Dota 2 (8 high-value items including immortals, arcanas)
 
 **Example Usage:**
 ```json
@@ -161,21 +166,21 @@ Get most expensive items sold in the last 24 hours by scanning high-value market
 {
   "appid": "730",
   "period": "24_hours",
-  "type": "market_scan_expensive",
+  "type": "expensive_items_analysis",
   "results": [
     {
       "name": "★ Karambit | Fade (Factory New)",
       "current_price": "$2,450.00",
       "highest_sale_24h": "$2,650.00",
+      "average_sale_24h": "$2,500.00",
       "recent_sales_count": 3,
       "market_url": "https://steamcommunity.com/market/listings/730/★%20Karambit%20%7C%20Fade%20(Factory%20New)"
     }
   ],
-  "total_scanned": 250,
-  "total_analyzed": 50,
+  "total_analyzed": 30,
   "total_found": 3,
   "status": "success",
-  "note": "Based on comprehensive Steam Market scan for high-value sales"
+  "note": "Based on analysis of known high-value items with real sales data"
 }
 ```
 
