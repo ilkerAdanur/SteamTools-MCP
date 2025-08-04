@@ -4,7 +4,11 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import time
+import logging
 from datetime import datetime, timedelta
+
+# Configure logging for debugging
+logging.basicConfig(level=logging.ERROR, stream=sys.stderr)
 
 # Global cache for storing results
 _cache = {}
@@ -346,7 +350,7 @@ def get_popular_items_24h(appid, max_results=10):
 
     try:
         # Step 1: Quick market scan for discovery (limited to avoid rate limits)
-        print(f"Quick scanning Steam Market for appid {appid}...")
+        logging.info(f"Quick scanning Steam Market for appid {appid}...")
 
         search_url = f"https://steamcommunity.com/market/search/render/"
         params = {
@@ -413,14 +417,14 @@ def get_popular_items_24h(appid, max_results=10):
                     "market_url": item_url
                 })
 
-        print(f"Found {len(all_items)} items to analyze. Checking sales data...")
+        logging.info(f"Found {len(all_items)} items to analyze. Checking sales data...")
 
         # Step 3: Analyze sales data for top items (limited to avoid timeouts)
         items_to_analyze = all_items[:30]  # Analyze top 30 items only
 
         for i, item in enumerate(items_to_analyze):
             try:
-                print(f"Analyzing item {i+1}/{len(items_to_analyze)}: {item['name'][:50]}...")
+                logging.info(f"Analyzing item {i+1}/{len(items_to_analyze)}: {item['name'][:50]}...")
 
                 # Get detailed sales data from item page
                 response = session.get(item['market_url'], timeout=8)
@@ -613,11 +617,11 @@ def get_most_expensive_sold_24h(appid, max_results=10):
     expensive_sales = []
 
     try:
-        print(f"Analyzing {len(items_to_check)} high-value items for appid {appid}...")
+        logging.info(f"Analyzing {len(items_to_check)} high-value items for appid {appid}...")
 
         for i, item_name in enumerate(items_to_check):
             try:
-                print(f"Analyzing expensive item {i+1}/{len(items_to_check)}: {item_name[:50]}...")
+                logging.info(f"Analyzing expensive item {i+1}/{len(items_to_check)}: {item_name[:50]}...")
 
                 # Get item data including recent sales
                 import urllib.parse
@@ -708,7 +712,7 @@ def get_most_expensive_sold_24h(appid, max_results=10):
                 rate_limit_delay(1.0)
 
             except Exception as e:
-                print(f"Error analyzing {item_name}: {str(e)}")
+                logging.error(f"Error analyzing {item_name}: {str(e)}")
                 continue
 
         # Sort by highest sale price and return top results
@@ -947,9 +951,17 @@ def get_most_expensive_sold_weekly(appid, max_results=10):
 def main():
     """Main MCP server loop"""
     try:
+        # Ensure stdout is flushed immediately
+        sys.stdout.reconfigure(line_buffering=True)
+        sys.stderr.reconfigure(line_buffering=True)
+
         for line in sys.stdin:
             try:
-                req = json.loads(line.strip())
+                line = line.strip()
+                if not line:
+                    continue
+
+                req = json.loads(line)
                 id_ = req.get("id")
                 method = req.get("method")
 

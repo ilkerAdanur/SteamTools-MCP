@@ -3,7 +3,6 @@ startCommand:
   configSchema:
     type: object
     properties: {}
-  commandFunction:
-    |-
+  commandFunction: |-
     (config) => ({ command: 'python', args: ['server.py'] })
   exampleConfig: {}
