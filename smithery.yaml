@@ -4,5 +4,5 @@ startCommand:
     type: object
     properties: {}
   commandFunction: |-
-    (config) => ({ command: 'python', args: ['server.py'] })
+    (config) => ({ command: 'python', args: ['-u', 'server.py'] })
   exampleConfig: {}

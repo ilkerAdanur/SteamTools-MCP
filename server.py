@@ -1010,17 +1010,24 @@ def get_most_expensive_sold_weekly(appid, max_results=10):
     return result
 
 def main():
-    """Main MCP server loop"""
+    """Main MCP server loop with enhanced Smithery compatibility"""
     try:
-        # Ensure stdout is flushed immediately
+        # Ensure stdout is flushed immediately for Smithery compatibility
         sys.stdout.reconfigure(line_buffering=True)
         sys.stderr.reconfigure(line_buffering=True)
+
+        # Send ready signal for Smithery
+        sys.stderr.write("MCP Server starting...\n")
+        sys.stderr.flush()
 
         for line in sys.stdin:
             try:
                 line = line.strip()
                 if not line:
                     continue
+
+                # Log incoming request for debugging
+                logging.info(f"Received request: {line[:100]}...")
 
                 req = json.loads(line)
                 id_ = req.get("id")
@@ -1033,11 +1040,14 @@ def main():
                         "result": {
                             "protocolVersion": "2024-11-05",
                             "capabilities": {
-                                "tools": {}
+                                "tools": {},
+                                "logging": {},
+                                "prompts": {},
+                                "resources": {}
                             },
                             "serverInfo": {
                                 "name": "steamtools-mcp",
-                                "version": "1.0.0"
+                                "version": "1.4.0"
                             }
                         }
                     }
@@ -1175,19 +1185,30 @@ def main():
                                 }
                             }
                         else:
-                            result = fetch_item_data(appid, item_name)
-                            resp = {
-                                "jsonrpc": "2.0",
-                                "id": id_,
-                                "result": {
-                                    "content": [
-                                        {
-                                            "type": "text",
-                                            "text": json.dumps(result, indent=2)
-                                        }
-                                    ]
+                            try:
+                                result = fetch_item_data(appid, item_name)
+                                resp = {
+                                    "jsonrpc": "2.0",
+                                    "id": id_,
+                                    "result": {
+                                        "content": [
+                                            {
+                                                "type": "text",
+                                                "text": json.dumps(result, indent=2, ensure_ascii=False)
+                                            }
+                                        ]
+                                    }
                                 }
-                            }
+                            except Exception as e:
+                                logging.error(f"Tool execution error: {e}")
+                                resp = {
+                                    "jsonrpc": "2.0",
+                                    "id": id_,
+                                    "error": {
+                                        "code": -32603,
+                                        "message": f"Tool execution failed: {str(e)}"
+                                    }
+                                }
 
                     elif tool_name == "search_steam_items":
                         appid = arguments.get("appid")
@@ -1204,23 +1225,34 @@ def main():
                                 }
                             }
                         else:
-                            # Validate max_results
-                            if not isinstance(max_results, int) or max_results < 1 or max_results > 50:
-                                max_results = 10
+                            try:
+                                # Validate max_results
+                                if not isinstance(max_results, int) or max_results < 1 or max_results > 50:
+                                    max_results = 10
 
-                            result = search_steam_items(appid, search_term, max_results)
-                            resp = {
-                                "jsonrpc": "2.0",
-                                "id": id_,
-                                "result": {
-                                    "content": [
-                                        {
-                                            "type": "text",
-                                            "text": json.dumps(result, indent=2)
-                                        }
-                                    ]
+                                result = search_steam_items(appid, search_term, max_results)
+                                resp = {
+                                    "jsonrpc": "2.0",
+                                    "id": id_,
+                                    "result": {
+                                        "content": [
+                                            {
+                                                "type": "text",
+                                                "text": json.dumps(result, indent=2, ensure_ascii=False)
+                                            }
+                                        ]
+                                    }
                                 }
-                            }
+                            except Exception as e:
+                                logging.error(f"Tool execution error: {e}")
+                                resp = {
+                                    "jsonrpc": "2.0",
+                                    "id": id_,
+                                    "error": {
+                                        "code": -32603,
+                                        "message": f"Tool execution failed: {str(e)}"
+                                    }
+                                }
 
                     elif tool_name == "get_popular_items_24h":
                         appid = arguments.get("appid")
@@ -1300,23 +1332,34 @@ def main():
                                 }
                             }
                         else:
-                            # Validate max_results
-                            if not isinstance(max_results, int) or max_results < 1 or max_results > 20:
-                                max_results = 10
+                            try:
+                                # Validate max_results
+                                if not isinstance(max_results, int) or max_results < 1 or max_results > 20:
+                                    max_results = 10
 
-                            result = get_most_expensive_sold_weekly(appid, max_results)
-                            resp = {
-                                "jsonrpc": "2.0",
-                                "id": id_,
-                                "result": {
-                                    "content": [
-                                        {
-                                            "type": "text",
-                                            "text": json.dumps(result, indent=2)
-                                        }
-                                    ]
+                                result = get_most_expensive_sold_weekly(appid, max_results)
+                                resp = {
+                                    "jsonrpc": "2.0",
+                                    "id": id_,
+                                    "result": {
+                                        "content": [
+                                            {
+                                                "type": "text",
+                                                "text": json.dumps(result, indent=2, ensure_ascii=False)
+                                            }
+                                        ]
+                                    }
                                 }
-                            }
+                            except Exception as e:
+                                logging.error(f"Tool execution error: {e}")
+                                resp = {
+                                    "jsonrpc": "2.0",
+                                    "id": id_,
+                                    "error": {
+                                        "code": -32603,
+                                        "message": f"Tool execution failed: {str(e)}"
+                                    }
+                                }
 
                     else:
                         resp = {
@@ -1324,7 +1367,7 @@ def main():
                             "id": id_,
                             "error": {
                                 "code": -32601,
-                                "message": f"Tool not found: {tool_name}"
+                                "message": f"Tool not found: {tool_name}. Available tools: get_steam_item_data, search_steam_items, get_popular_items_24h, get_most_expensive_sold_24h, get_most_expensive_sold_weekly"
                             }
                         }
                 else:
@@ -1337,7 +1380,11 @@ def main():
                         }
                     }
 
-                sys.stdout.write(json.dumps(resp) + "\n")
+                # Log response for debugging
+                response_str = json.dumps(resp)
+                logging.info(f"Sending response: {response_str[:100]}...")
+
+                sys.stdout.write(response_str + "\n")
                 sys.stdout.flush()
 
             except json.JSONDecodeError as e:

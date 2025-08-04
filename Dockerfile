@@ -24,4 +24,4 @@ RUN chmod +x server.py
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONIOENCODING=utf-8
 
-CMD ["python", "-u", "server.py"]
+CMD ["python", "-u", "-W", "ignore", "server.py"]
