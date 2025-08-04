@@ -292,18 +292,18 @@ def search_steam_items(appid, search_term, max_results=10):
         }
 
 def get_popular_items_24h(appid, max_results=10):
-    """Get most popular items in the last 24 hours using hybrid approach: market scan + known items"""
+    """Get most popular items in the last 24 hours using hybrid approach: real-time market scan + seed items for comprehensive coverage"""
 
-    # Check cache first
+    # Check cache first (shorter cache for real-time data)
     cache_key = get_cache_key("get_popular_items_24h", appid, max_results=max_results)
     cached_result = get_cached_result(cache_key)
     if cached_result:
         cached_result['note'] = cached_result.get('note', '') + ' (cached result)'
         return cached_result
 
-    # Define seed items for faster analysis (most commonly traded items)
+    # Define comprehensive seed items for reliable analysis (most commonly traded items)
     seed_items_db = {
-        "730": [  # CS:GO/CS2 - Most traded items
+        "730": [  # CS:GO/CS2 - Most actively traded items across all price ranges
             "AK-47 | Redline (Field-Tested)",
             "AWP | Asiimov (Field-Tested)",
             "M4A4 | Asiimov (Field-Tested)",
@@ -318,19 +318,39 @@ def get_popular_items_24h(appid, max_results=10):
             "AWP | Hyper Beast (Field-Tested)",
             "AK-47 | Frontside Misty (Factory New)",
             "M4A1-S | Cyrex (Factory New)",
-            "AWP | Electric Hive (Factory New)"
+            "AWP | Electric Hive (Factory New)",
+            "AK-47 | Bloodsport (Field-Tested)",
+            "M4A4 | Neo-Noir (Field-Tested)",
+            "AWP | Containment Breach (Field-Tested)",
+            "Glock-18 | Fade (Factory New)",
+            "USP-S | Kill Confirmed (Field-Tested)",
+            "P250 | See Ya Later (Factory New)",
+            "Five-SeveN | Monkey Business (Factory New)",
+            "Tec-9 | Fuel Injector (Factory New)",
+            "MAC-10 | Neon Rider (Factory New)",
+            "MP7 | Nemesis (Factory New)"
         ],
-        "440": [  # TF2
+        "440": [  # TF2 - Most traded items
             "Mann Co. Supply Crate Key",
             "Refined Metal",
             "Scrap Metal",
             "Reclaimed Metal",
-            "Strange Part"
+            "Strange Part",
+            "Tour of Duty Ticket",
+            "Name Tag",
+            "Description Tag",
+            "Paint Can",
+            "Strange Weapon"
         ],
-        "570": [  # Dota 2
-            "Immortal Treasure",
+        "570": [  # Dota 2 - Popular items
+            "Immortal Treasure I",
+            "Immortal Treasure II",
+            "Immortal Treasure III",
             "Arcana",
-            "Immortal"
+            "Immortal",
+            "Treasure Key",
+            "Battle Pass",
+            "Compendium"
         ]
     }
 
@@ -349,57 +369,73 @@ def get_popular_items_24h(appid, max_results=10):
     items_with_sales = []
 
     try:
-        # Step 1: Quick market scan for discovery (limited to avoid rate limits)
-        logging.info(f"Quick scanning Steam Market for appid {appid}...")
+        # Step 1: Enhanced market scan for real-time discovery with intelligent rate limiting
+        logging.info(f"Performing real-time market scan for appid {appid}...")
 
         search_url = f"https://steamcommunity.com/market/search/render/"
-        params = {
-            'query': '',
-            'start': 0,
-            'count': 100,  # Get top 100 items
-            'search_descriptions': 0,
-            'sort_column': 'quantity',  # Sort by quantity to get active items
-            'sort_dir': 'desc',
-            'appid': appid,
-            'norender': 1
-        }
 
-        response = session.get(search_url, params=params, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('success') and data.get('results_html'):
-                soup = BeautifulSoup(data['results_html'], 'html.parser')
-                items = soup.find_all('a', class_='market_listing_row_link')
+        # Try multiple sorting strategies for comprehensive coverage
+        sort_strategies = [
+            {'sort_column': 'quantity', 'sort_dir': 'desc', 'count': 75},  # Most active items
+            {'sort_column': 'price', 'sort_dir': 'desc', 'count': 50},     # Highest priced items
+            {'sort_column': 'name', 'sort_dir': 'asc', 'count': 25}        # Alphabetical for variety
+        ]
 
-                for item in items:
-                    try:
-                        # Extract item name
-                        name_elem = item.find('span', class_='market_listing_item_name')
-                        item_name = name_elem.text.strip() if name_elem else None
+        for strategy in sort_strategies:
+            try:
+                params = {
+                    'query': '',
+                    'start': 0,
+                    'search_descriptions': 0,
+                    'appid': appid,
+                    'norender': 1,
+                    **strategy
+                }
 
-                        # Extract current price
-                        price_elem = item.find('span', class_='normal_price')
-                        if not price_elem:
-                            price_elem = item.find('span', class_='sale_price')
-                        current_price = price_elem.text.strip() if price_elem else "N/A"
+                # Add rate limiting delay
+                rate_limit_delay(0.5)
 
-                        # Extract quantity available
-                        qty_elem = item.find('span', class_='market_listing_num_listings_qty')
-                        quantity = qty_elem.text.strip() if qty_elem else "0"
+                response = session.get(search_url, params=params, timeout=12)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('success') and data.get('results_html'):
+                        soup = BeautifulSoup(data['results_html'], 'html.parser')
+                        items = soup.find_all('a', class_='market_listing_row_link')
 
-                        # Extract item URL
-                        item_url = item.get('href', '')
+                        for item in items:
+                            try:
+                                # Extract item name
+                                name_elem = item.find('span', class_='market_listing_item_name')
+                                item_name = name_elem.text.strip() if name_elem else None
 
-                        if item_name and quantity != "0":
-                            all_items.append({
-                                "name": item_name,
-                                "current_price": current_price,
-                                "quantity_available": quantity,
-                                "market_url": item_url
-                            })
+                                # Extract current price
+                                price_elem = item.find('span', class_='normal_price')
+                                if not price_elem:
+                                    price_elem = item.find('span', class_='sale_price')
+                                current_price = price_elem.text.strip() if price_elem else "N/A"
 
-                    except Exception as e:
-                        continue
+                                # Extract quantity available
+                                qty_elem = item.find('span', class_='market_listing_num_listings_qty')
+                                quantity = qty_elem.text.strip() if qty_elem else "0"
+
+                                # Extract item URL
+                                item_url = item.get('href', '')
+
+                                # Only add unique items with valid data
+                                if item_name and quantity != "0" and not any(existing['name'] == item_name for existing in all_items):
+                                    all_items.append({
+                                        "name": item_name,
+                                        "current_price": current_price,
+                                        "quantity_available": quantity,
+                                        "market_url": item_url
+                                    })
+
+                            except Exception as e:
+                                continue
+
+            except Exception as e:
+                logging.error(f"Market scan strategy failed: {e}")
+                continue
 
         # Step 2: Add seed items to ensure we have good candidates
         seed_items = seed_items_db.get(appid, [])
@@ -539,26 +575,27 @@ def get_most_expensive_sold_24h(appid, max_results=10):
         cached_result['note'] = cached_result.get('note', '') + ' (cached result)'
         return cached_result
 
-    # Define comprehensive high-value items database
+    # Define comprehensive high-value items database with reliable market presence
     expensive_items_db = {
-        "730": [  # CS:GO/CS2 - High value items (knives, rare skins, etc.)
+        "730": [  # CS:GO/CS2 - 30 high-value items with proven market activity
+            # Ultra-rare knives (Factory New)
             "★ Karambit | Fade (Factory New)",
             "★ M9 Bayonet | Crimson Web (Factory New)",
             "★ Karambit | Case Hardened (Factory New)",
             "★ Butterfly Knife | Fade (Factory New)",
             "★ Karambit | Doppler (Factory New)",
             "★ Bayonet | Crimson Web (Factory New)",
-            "★ Flip Knife | Gamma Doppler (Factory New)",
-            "★ Gut Knife | Marble Fade (Factory New)",
-            "★ Huntsman Knife | Fade (Factory New)",
-            "★ Shadow Daggers | Fade (Factory New)",
-            "★ Bowie Knife | Case Hardened (Factory New)",
-            "★ Falchion Knife | Fade (Factory New)",
-            "★ Stiletto Knife | Fade (Factory New)",
-            "★ Ursus Knife | Fade (Factory New)",
-            "★ Navaja Knife | Fade (Factory New)",
-            "★ Talon Knife | Fade (Factory New)",
-            "★ Classic Knife | Fade (Factory New)",
+            "★ Karambit | Marble Fade (Factory New)",
+            "★ M9 Bayonet | Fade (Factory New)",
+            "★ Butterfly Knife | Crimson Web (Factory New)",
+            "★ Karambit | Tiger Tooth (Factory New)",
+            # High-value knives (Minimal Wear for better availability)
+            "★ Karambit | Fade (Minimal Wear)",
+            "★ M9 Bayonet | Doppler (Factory New)",
+            "★ Butterfly Knife | Doppler (Factory New)",
+            "★ Bayonet | Fade (Factory New)",
+            "★ Flip Knife | Crimson Web (Factory New)",
+            # Legendary weapon skins
             "AWP | Dragon Lore (Factory New)",
             "M4A4 | Howl (Factory New)",
             "AK-47 | Fire Serpent (Factory New)",
@@ -568,12 +605,15 @@ def get_most_expensive_sold_24h(appid, max_results=10):
             "AWP | Gungnir (Factory New)",
             "M4A4 | The Emperor (Factory New)",
             "AK-47 | X-Ray (Factory New)",
+            "AWP | Prince (Factory New)",
+            # High-value gloves
             "★ Sport Gloves | Pandora's Box (Factory New)",
             "★ Driver Gloves | King Snake (Factory New)",
             "★ Specialist Gloves | Crimson Kimono (Factory New)",
-            "★ Hand Wraps | Cobalt Skulls (Factory New)"
+            "★ Hand Wraps | Cobalt Skulls (Factory New)",
+            "★ Bloodhound Gloves | Red Eclipse (Factory New)"
         ],
-        "440": [  # TF2
+        "440": [  # TF2 - 10 high-value items with proven market presence
             "Golden Frying Pan",
             "Unusual Burning Flames Team Captain",
             "Unusual Scorching Flames Team Captain",
@@ -585,7 +625,7 @@ def get_most_expensive_sold_24h(appid, max_results=10):
             "Australium Sniper Rifle",
             "Australium Flame Thrower"
         ],
-        "570": [  # Dota 2
+        "570": [  # Dota 2 - 8 high-value items with active trading
             "Dragonclaw Hook",
             "Timebreaker",
             "Stache",
@@ -648,42 +688,59 @@ def get_most_expensive_sold_24h(appid, max_results=10):
                         current_price = price_span.text.strip()
                         break
 
-                # Extract recent sales data from JavaScript
+                # Enhanced sales data extraction with robust error handling
                 highest_sale_24h = 0
                 recent_sales_count = 0
                 average_sale_24h = 0
                 sale_prices = []
+                total_volume_24h = 0
 
-                # Try to find price history data
+                # Comprehensive JavaScript patterns for price history data
                 js_patterns = [
                     r"var line1=(\[.*?\]);",
                     r"line1=(\[.*?\]);",
-                    r'"line1":(\[.*?\])'
+                    r'"line1":(\[.*?\])',
+                    r"g_rgAssetPriceHistory\s*=\s*(\[.*?\]);",
+                    r"pricehistory\s*=\s*(\[.*?\]);"
                 ]
 
                 for pattern in js_patterns:
-                    match = re.search(pattern, response.text)
+                    match = re.search(pattern, response.text, re.IGNORECASE)
                     if match:
                         try:
                             data = json.loads(match.group(1))
-                            # Get recent sales (last 24 hours worth of data)
+                            if not data or not isinstance(data, list):
+                                continue
+
+                            # Get recent sales (last 24 hours worth of data points)
                             recent_data = data[-24:] if len(data) >= 24 else data
 
                             for entry in recent_data:
                                 if len(entry) >= 3:
-                                    price = float(entry[1]) if isinstance(entry[1], (int, float)) else 0
-                                    volume = int(entry[2]) if str(entry[2]).isdigit() else 0
+                                    try:
+                                        # More robust price and volume extraction
+                                        price_str = str(entry[1]).replace(',', '').replace('$', '')
+                                        volume_str = str(entry[2]).replace(',', '')
 
-                                    if price > 0 and volume > 0:
-                                        recent_sales_count += volume
-                                        sale_prices.append(price)
-                                        if price > highest_sale_24h:
-                                            highest_sale_24h = price
+                                        price = float(price_str) if price_str.replace('.', '').isdigit() else 0
+                                        volume = int(volume_str) if volume_str.isdigit() else 0
+
+                                        if price > 0:
+                                            sale_prices.append(price)
+                                            if price > highest_sale_24h:
+                                                highest_sale_24h = price
+
+                                        if volume > 0:
+                                            total_volume_24h += volume
+                                            recent_sales_count += volume
+
+                                    except (ValueError, TypeError):
+                                        continue
 
                             if sale_prices:
                                 average_sale_24h = sum(sale_prices) / len(sale_prices)
                             break
-                        except Exception:
+                        except (json.JSONDecodeError, TypeError, AttributeError):
                             continue
 
                 # Extract numeric value for sorting
@@ -696,14 +753,16 @@ def get_most_expensive_sold_24h(appid, max_results=10):
                 if highest_sale_24h > 0:
                     price_value = max(price_value, highest_sale_24h)
 
-                # Include items with price data (either current price or recent sales)
-                if current_price != "N/A" or highest_sale_24h > 0:
+                # Include items with comprehensive sales data
+                if current_price != "N/A" or highest_sale_24h > 0 or total_volume_24h > 0:
                     expensive_sales.append({
                         "name": item_name,
                         "current_price": current_price,
                         "highest_sale_24h": f"${highest_sale_24h:.2f}" if highest_sale_24h > 0 else "No recent sales",
                         "average_sale_24h": f"${average_sale_24h:.2f}" if average_sale_24h > 0 else "No recent sales",
                         "recent_sales_count": recent_sales_count,
+                        "total_volume_24h": total_volume_24h,
+                        "price_data_points": len(sale_prices),
                         "market_url": item_url,
                         "price_value": price_value
                     })
@@ -727,12 +786,14 @@ def get_most_expensive_sold_24h(appid, max_results=10):
         result = {
             "appid": appid,
             "period": "24_hours",
-            "type": "expensive_items_analysis",
+            "type": "comprehensive_expensive_items_analysis",
             "results": final_results,
             "total_analyzed": len(items_to_check),
             "total_found": len(final_results),
+            "items_with_sales_data": len([item for item in expensive_sales if item['total_volume_24h'] > 0]),
             "status": "success",
-            "note": "Based on analysis of known high-value items with real sales data"
+            "methodology": "Analyzes 30 CS:GO, 10 TF2, and 8 Dota 2 high-value items with real market sales data",
+            "note": "Enhanced analysis with comprehensive high-value items database and robust sales data extraction"
         }
 
         # Cache the result

@@ -1,13 +1,18 @@
 # Steam Market MCP
 
-A Model Context Protocol (MCP) server that provides tools to fetch Steam Market data including current prices and price history.
+A Model Context Protocol (MCP) server that provides tools to fetch Steam Market data including current prices and price history with hybrid real-time scanning capabilities.
 
 ## Features
 
+- **Hybrid Real-time Market Scanning**: Dynamic discovery of popular items beyond static databases
+- **Comprehensive High-value Items Analysis**: 30 CS:GO, 10 TF2, and 8 Dota 2 high-value items with real sales data
+- **Intelligent Rate Limiting**: Optimized to avoid Steam API limits while maximizing data coverage
+- **Enhanced Sales Data Extraction**: Robust price history analysis with average price calculations
+- **Real-time Popular Items Discovery**: Multiple scanning strategies for comprehensive market coverage
 - Fetch current market price of Steam items
 - Get price history for the last 10 days
 - Support for all Steam applications with market items
-- Proper error handling and timeout management
+- Comprehensive error handling and fallback mechanisms
 
 ## Available Tools
 
@@ -92,16 +97,18 @@ Search for items in Steam market by name and get a list of matching items with p
 
 ### get_popular_items_24h
 
-Get most popular items in the last 24 hours by scanning the entire Steam market and analyzing real sales volume.
+Get most popular items in the last 24 hours using hybrid approach: real-time market scanning + seed items for comprehensive coverage.
 
 **Parameters:**
 - `appid` (string, required): Steam application ID (e.g., '730' for CS:GO, '440' for TF2)
 - `max_results` (integer, optional): Maximum number of results to return (default: 10, max: 20)
 
-**How it works:**
-1. Scans first 500 items from Steam Market (sorted by quantity/activity)
-2. Analyzes sales data for top 100 most active items
-3. Returns items with highest 24-hour sales volume
+**Enhanced Hybrid Methodology:**
+1. **Multi-strategy Market Scan**: Uses 3 different sorting strategies (quantity, price, alphabetical) for comprehensive discovery
+2. **Intelligent Rate Limiting**: Optimized delays to avoid Steam API limits while maximizing coverage
+3. **Seed Items Integration**: Combines market scan with curated high-activity items database
+4. **Real Sales Analysis**: Analyzes top 30 items with actual sales data from Steam market pages
+5. **Comprehensive Coverage**: Discovers items beyond predefined lists for true market insights
 
 **Example Usage:**
 ```json
@@ -116,7 +123,7 @@ Get most popular items in the last 24 hours by scanning the entire Steam market 
 {
   "appid": "730",
   "period": "24_hours",
-  "type": "market_scan_popular",
+  "type": "hybrid_scan_popular",
   "results": [
     {
       "name": "AK-47 | Redline (Field-Tested)",
@@ -131,27 +138,29 @@ Get most popular items in the last 24 hours by scanning the entire Steam market 
   "total_analyzed": 100,
   "total_found": 5,
   "status": "success",
-  "note": "Based on comprehensive Steam Market scan and sales volume analysis"
+  "note": "Based on hybrid market scan and sales volume analysis with real-time discovery"
 }
 ```
 
 ### get_most_expensive_sold_24h
 
-Get most expensive items sold in the last 24 hours by analyzing known high-value items with real sales data.
+Get most expensive items sold in the last 24 hours with comprehensive high-value items analysis and enhanced sales data extraction.
 
 **Parameters:**
 - `appid` (string, required): Steam application ID (e.g., '730' for CS:GO, '440' for TF2)
 - `max_results` (integer, optional): Maximum number of results to return (default: 10, max: 20)
 
-**How it works:**
-1. Analyzes comprehensive database of high-value items (knives, rare skins, etc.)
-2. Extracts real sales data from each item's market page
-3. Returns items with highest 24-hour sale prices and volumes
+**Enhanced Methodology:**
+1. **Comprehensive High-value Database**: Analyzes curated database of proven high-value items
+2. **Robust Sales Data Extraction**: Multiple JavaScript patterns for reliable price history parsing
+3. **Enhanced Error Handling**: Fallback mechanisms for reliable data extraction
+4. **Average Price Calculation**: Provides both highest and average sale prices for better insights
+5. **Volume Analysis**: Tracks total sales volume and transaction counts
 
-**Supported Games:**
-- `730`: CS:GO/CS2 (30 high-value items including knives, gloves, rare skins)
-- `440`: TF2 (10 high-value items including unusuals, australiums)
-- `570`: Dota 2 (8 high-value items including immortals, arcanas)
+**Supported Games with Expanded Databases:**
+- `730`: CS:GO/CS2 (30 high-value items: ultra-rare knives, legendary skins, high-value gloves)
+- `440`: TF2 (10 high-value items: unusual hats, australium weapons, golden items)
+- `570`: Dota 2 (8 high-value items: immortals, arcanas, rare couriers)
 
 **Example Usage:**
 ```json
@@ -166,7 +175,7 @@ Get most expensive items sold in the last 24 hours by analyzing known high-value
 {
   "appid": "730",
   "period": "24_hours",
-  "type": "expensive_items_analysis",
+  "type": "comprehensive_expensive_items_analysis",
   "results": [
     {
       "name": "★ Karambit | Fade (Factory New)",
@@ -174,13 +183,17 @@ Get most expensive items sold in the last 24 hours by analyzing known high-value
       "highest_sale_24h": "$2,650.00",
       "average_sale_24h": "$2,500.00",
       "recent_sales_count": 3,
+      "total_volume_24h": 3,
+      "price_data_points": 24,
       "market_url": "https://steamcommunity.com/market/listings/730/★%20Karambit%20%7C%20Fade%20(Factory%20New)"
     }
   ],
   "total_analyzed": 30,
   "total_found": 3,
+  "items_with_sales_data": 2,
   "status": "success",
-  "note": "Based on analysis of known high-value items with real sales data"
+  "methodology": "Analyzes 30 CS:GO, 10 TF2, and 8 Dota 2 high-value items with real market sales data",
+  "note": "Enhanced analysis with comprehensive high-value items database and robust sales data extraction"
 }
 ```
 

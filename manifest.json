@@ -1,11 +1,11 @@
 {
   "name": "steamtools-mcp",
-  "version": "1.3.2",
-  "description": "MCP server for fetching Steam Market item prices and price history",
+  "version": "1.4.0",
+  "description": "MCP server for fetching Steam Market item prices and price history with hybrid real-time scanning",
   "entrypoint": "server.py",
   "language": "python",
   "type": "mcp",
   "author": "ilkerAdanur",
-  "keywords": ["steam", "market", "prices", "gaming", "mcp"],
+  "keywords": ["steam", "market", "prices", "gaming", "mcp", "real-time", "hybrid-scanning"],
   "repository": "https://github.com/ilkerAdanur/steamtools-mcp"
 }
