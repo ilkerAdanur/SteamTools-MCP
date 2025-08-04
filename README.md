@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/ilkeradanur-steamtools-mcp-badge.png)](https://mseep.ai/app/ilkeradanur-steamtools-mcp)
+
 # Steam Market MCP
 
 A Model Context Protocol (MCP) server that provides tools to fetch Steam Market data including current prices and price history with hybrid real-time scanning capabilities.
